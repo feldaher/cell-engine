@@ -7,7 +7,7 @@ Shared by [Jelly Cells](https://github.com/feldaher/jelly-cells), [Regrow](https
 ## Use
 
 ```json
-"dependencies": { "@feldaher/cell-engine": "git+https://github.com/feldaher/cell-engine.git#v0.2.1" }
+"dependencies": { "@feldaher/cell-engine": "git+https://github.com/feldaher/cell-engine.git#v0.2.2" }
 ```
 
 The package ships TypeScript source (`import { buildSimMesh } from '@feldaher/cell-engine/mesh/tetgen'`). In the app's Vite config:
