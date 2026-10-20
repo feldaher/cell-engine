@@ -29,3 +29,9 @@ Feature: An enclosed volume can be held to a target
     When the target is lowered by 10 percent and it settles
     Then the enclosed volume is within 1 percent of the target
     And the cavity pressure is negative
+
+  Scenario: Capping an open surface closes it around the right volume
+    Given the upper half of a sphere of radius 1, open at the equator
+    When its rim is capped
+    Then the capped surface is closed
+    And the enclosed volume is within 5 percent of two thirds pi

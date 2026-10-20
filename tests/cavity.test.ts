@@ -1,7 +1,7 @@
 import { loadFeature, describeFeature } from '@amiceli/vitest-cucumber';
 import { expect } from 'vitest';
 import { simulate, spherePiece, unitCube } from './helpers';
-import { boundaryFaces } from '../src/mesh/boundary';
+import { boundaryFaces, capBoundary, isClosed } from '../src/mesh/boundary';
 import { cavityPressure, cavityVolume, solveCavities, type Cavity } from '../src/physics/cavity';
 import { defaultParams } from '../src/physics/params';
 import type { Piece } from '../src/contracts';
@@ -85,5 +85,26 @@ describeFeature(feature, ({ Scenario }) => {
       expect(Math.abs(cavityVolume(h.piece.sim.pos, h.cav.tris) / h.cav.target - 1)).toBeLessThan(0.01);
     });
     And('the cavity pressure is negative', () => expect(cavityPressure(h.cav, H)).toBeLessThan(0));
+  });
+
+  Scenario('Capping an open surface closes it around the right volume', ({ Given, When, Then, And }) => {
+    let pos: Float32Array, open: Uint32Array, capped: Uint32Array;
+    Given('the upper half of a sphere of radius 1, open at the equator', () => {
+      const sim = spherePiece(0).sim;
+      pos = sim.restPos;
+      // Keep the boundary faces whose centroid is above the equator; their rim is the equator.
+      const all = boundaryFaces(sim), keep: number[] = [];
+      for (let t = 0; t < all.length; t += 3) {
+        const y = (pos[3 * all[t] + 1] + pos[3 * all[t + 1] + 1] + pos[3 * all[t + 2] + 1]) / 3;
+        if (y > 0) keep.push(all[t], all[t + 1], all[t + 2]);
+      }
+      open = Uint32Array.from(keep);
+      expect(isClosed(open)).toBe(false);
+    });
+    When('its rim is capped', () => { capped = Uint32Array.from([...open, ...capBoundary(open)]); });
+    Then('the capped surface is closed', () => expect(isClosed(capped)).toBe(true));
+    And('the enclosed volume is within 5 percent of two thirds pi', () => {
+      expect(Math.abs(cavityVolume(pos, capped) / ((2 / 3) * Math.PI) - 1)).toBeLessThan(0.05);
+    });
   });
 });
