@@ -2,10 +2,15 @@
 // C = V(x) − target over a closed, outward-wound triangle surface of the simulation particles.
 // Breath's model spec, equations E1, E2 and E4.
 
-import type { SimMesh } from '../contracts';
+/** Anything with particles the constraint can move: a SimMesh or a Membrane. */
+export interface CavityBody {
+  pos: Float32Array;
+  /** 0 for a particle held in place. */
+  invMass: Float32Array;
+}
 
 export interface Cavity {
-  /** A CLOSED surface over sim-mesh particles, wound outward: 3 particle indices per triangle. */
+  /** A CLOSED surface over the body's particles, wound outward: 3 particle indices per triangle. */
   tris: Uint32Array;
   /** The volume the cavity is pulled toward (sim units³). */
   target: number;
@@ -38,11 +43,12 @@ const scratch = new WeakMap<Cavity, Float64Array>();
 
 /**
  * One XPBD solve of each cavity, to be called inside a substep (as the `constrain` hook of
- * physics/soft, or alongside the other constraints of physics/xpbd). `h` is the substep length.
+ * physics/soft or physics/membrane, or alongside the other constraints of physics/xpbd).
+ * `h` is the substep length.
  * Each call starts from λ = 0, as XPBD does within a substep.
  */
-export function solveCavities(sim: SimMesh, cavities: Cavity[], h: number): void {
-  const x = sim.pos, w = sim.invMass;
+export function solveCavities(body: CavityBody, cavities: Cavity[], h: number): void {
+  const x = body.pos, w = body.invMass;
   const n = w.length;
   for (const cav of cavities) {
     let g = scratch.get(cav);

@@ -7,7 +7,7 @@ Shared by [Jelly Cells](https://github.com/feldaher/jelly-cells), [Regrow](https
 ## Use
 
 ```json
-"dependencies": { "@feldaher/cell-engine": "git+https://github.com/feldaher/cell-engine.git#v0.2.2" }
+"dependencies": { "@feldaher/cell-engine": "git+https://github.com/feldaher/cell-engine.git#v0.3.0" }
 ```
 
 The package ships TypeScript source (`import { buildSimMesh } from '@feldaher/cell-engine/mesh/tetgen'`). In the app's Vite config:
@@ -31,6 +31,8 @@ test: { server: { deps: { inline: ['@feldaher/cell-engine'] } } },
 | `physics/xpbd` | many pieces, co-rotational tets + volume, floor, contact, grab (gelatin regime) |
 | `physics/soft` | one tissue-scale body whose settled shape does not depend on the substep count |
 | `physics/cavity` | an enclosed volume held to a target, with its pressure from the multiplier (breathing) |
+| `physics/membrane` | a thin sheet as a surface: stretch along the edges, fold resistance across them |
+| `mesh/icosphere` | a closed sphere with a topology you can rely on, by radius or by the volume it must enclose |
 | `cut/cut`, `cut/knife` | a world plane splits pieces; children inherit the motion; an animated blade |
 | `fields/fem` | reaction–diffusion by P1 FEM with lumped mass and backward Euler, amount-conserving under deformation, over tetrahedra in a volume or triangles on a surface |
 
