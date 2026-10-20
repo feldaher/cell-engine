@@ -195,10 +195,11 @@ export interface FieldSpec {
 export interface FieldSolver {
   readonly nNodes: number;
   /**
-   * Rebuild stiffness and lumped mass from the mesh's current positions. Each field in `carry`
-   * keeps its nodal AMOUNT across the rebuild (c ← M_old c / M_new).
+   * Rebuild stiffness and lumped mass from the mesh's current positions (the connectivity is
+   * fixed when the solver is made). Each field in `carry` keeps its nodal AMOUNT across the
+   * rebuild (c ← M_old c / M_new), which is how deformation dilutes concentrations.
    */
-  assemble(sim: SimMesh, carry?: Float64Array[]): void;
+  assemble(mesh: { pos: Float32Array }, carry?: Float64Array[]): void;
   /** Lumped nodal mass (volume share), from the last `assemble`. */
   mass(): Float64Array;
   /**

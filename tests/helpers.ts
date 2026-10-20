@@ -72,3 +72,51 @@ export function meanVelocity(s: SimMesh): Vec3 {
   }
   return [v[0] / m, v[1] / m, v[2] / m];
 }
+
+/** Unit cube [0,1]³ as 12 outward-wound triangles over 8 corner particles. */
+export function unitCube(): { pos: Float32Array; tris: Uint32Array } {
+  const pos = new Float32Array([0,0,0, 1,0,0, 1,1,0, 0,1,0, 0,0,1, 1,0,1, 1,1,1, 0,1,1]);
+  const q = (a: number, b: number, c: number, d: number) => [a, b, c, a, c, d];
+  const tris = Uint32Array.from([
+    ...q(0, 3, 2, 1),   // z = 0, outward -z
+    ...q(4, 5, 6, 7),   // z = 1, outward +z
+    ...q(0, 1, 5, 4),   // y = 0
+    ...q(2, 3, 7, 6),   // y = 1
+    ...q(0, 4, 7, 3),   // x = 0
+    ...q(1, 2, 6, 5),   // x = 1
+  ]);
+  return { pos, tris };
+}
+
+/** A flat square sheet of side `side` in the z = 0 plane, as a triangulated grid of `n`×`n` cells. */
+export function flatSheet(side = 10, n = 20): { pos: Float32Array; tris: Uint32Array } {
+  const h = side / n, m = n + 1;
+  const pos = new Float32Array(m * m * 3);
+  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+    const v = 3 * (i + m * j);
+    pos[v] = i * h; pos[v + 1] = j * h; pos[v + 2] = 0;
+  }
+  const tris: number[] = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const a = i + m * j, b = a + 1, c = a + m, d = c + 1;
+    tris.push(a, b, d, a, d, c);
+  }
+  return { pos, tris: Uint32Array.from(tris) };
+}
+
+/** A long flat strip along +x, `len` by `width`, triangulated at about `h` spacing. */
+export function flatStrip(len = 24, width = 1, h = 0.35): { pos: Float32Array; tris: Uint32Array } {
+  const nx = Math.round(len / h), ny = Math.max(1, Math.round(width / h));
+  const mx = nx + 1, my = ny + 1;
+  const pos = new Float32Array(mx * my * 3);
+  for (let j = 0; j < my; j++) for (let i = 0; i < mx; i++) {
+    const v = 3 * (i + mx * j);
+    pos[v] = (i / nx) * len; pos[v + 1] = (j / ny) * width; pos[v + 2] = 0;
+  }
+  const tris: number[] = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const a = i + mx * j, b = a + 1, c = a + mx, d = c + 1;
+    tris.push(a, b, d, a, d, c);
+  }
+  return { pos, tris: Uint32Array.from(tris) };
+}
