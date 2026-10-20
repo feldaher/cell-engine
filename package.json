@@ -1,0 +1,20 @@
+{
+  "name": "@feldaher/cell-engine",
+  "version": "0.1.0",
+  "description": "Soft bodies from signed distance fields: tet meshing, embedding, XPBD, contact, cutting and reaction-diffusion fields. Shared by Jelly Cells, Regrow, Close the Wound and Breath.",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "files": ["src"],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@amiceli/vitest-cucumber": "^5.2.1",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
+  }
+}
