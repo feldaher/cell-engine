@@ -1,5 +1,6 @@
 // Composing the shader prelude: app constants, engine constants, and the organelle hooks the
 // shaders call. An app defines any subset of the hooks; the rest keep the defaults below.
+// The composite hook (v0.5.0) is composed separately: it goes only into the composite module.
 
 /** "const K = v;" per entry, every value written as a WGSL float. */
 export function wgslConstants(c: Record<string, number>, header = ''): string {
@@ -19,6 +20,21 @@ const DEFAULTS: Record<string, string> = {
 /** Every hook the engine's shaders call. */
 export const ORGANELLE_HOOKS = Object.keys(DEFAULTS);
 
+/**
+ * Ids written to the G-buffers' fourth channel (v0.5.0). An organelle of material m writes ORGANELLE + m, and a jelly
+ * cut face over material m writes SECTION + m. All stay exact in an f16 channel for up to 2000 material slots.
+ */
+export function gbufferIds(materialSlots: number) {
+  return { NONE: 0, FLOOR: 1, KNIFE: 2, SKIN: 3, ORGANELLE: 4, SECTION: 4 + materialSlots } as const;
+}
+
+export const COMPOSITE_HOOK_DEFAULT = 'fn hookComposite(c: vec3f, px: vec2i, uv: vec2f) -> vec3f { return c; }';
+
+/** The app's hookComposite, or the identity. */
+export function composeCompositeHook(app?: string): string {
+  return app && /fn\s+hookComposite\s*\(/.test(app) ? app + '\n' : COMPOSITE_HOOK_DEFAULT + '\n';
+}
+
 export interface PreludeOptions {
   materialSlots: number;
   wallMaterial: number;
@@ -34,5 +50,6 @@ export function composeShaderPrelude(o: PreludeOptions): string {
   return (o.constantsWgsl ?? '') + '\n'
     + `const MATERIAL_SLOTS = ${o.materialSlots}u;\n`
     + wgslConstants({ WALL_MAT: o.wallMaterial, SCAR_MAT: o.scarMaterial })
+    + wgslConstants(Object.fromEntries(Object.entries(gbufferIds(o.materialSlots)).map(([k, v]) => [`GID_${k}`, v])))
     + app + '\n' + missing.join('\n') + '\n';
 }

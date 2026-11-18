@@ -2,7 +2,7 @@ import { loadFeature, describeFeature } from '@amiceli/vitest-cucumber';
 import { expect } from 'vitest';
 import { hexToLinear, linearToHex, packPalette, PALETTE, type Variety } from '../src/render/palette';
 import { hiddenMask, isHiddenIn, packPrimitives, type BodyPart } from '../src/render/primitives';
-import { composeShaderPrelude, ORGANELLE_HOOKS, wgslConstants } from '../src/render/wgsl';
+import { COMPOSITE_HOOK_DEFAULT, composeCompositeHook, composeShaderPrelude, gbufferIds, ORGANELLE_HOOKS, wgslConstants } from '../src/render/wgsl';
 import { Prim, PRIM_STRIDE, type Primitive } from '../src/contracts';
 
 const feature = await loadFeature('features/render.feature');
@@ -88,6 +88,38 @@ describeFeature(feature, ({ Scenario }) => {
     Then('the text declares a as 2.0 and b as 0.25', () => {
       expect(s).toContain('const a = 2.0;');
       expect(s).toContain('const b = 0.25;');
+    });
+  });
+
+  Scenario('The prelude declares the G-buffer ids', ({ When, Then, And }) => {
+    let s = '';
+    When('the shader prelude is composed for 24 material slots', () => { s = composeShaderPrelude({ materialSlots: 24, wallMaterial: 1, scarMaterial: -1 }); });
+    Then('it declares GID_NONE, GID_FLOOR, GID_KNIFE, GID_SKIN, GID_ORGANELLE and GID_SECTION with the values gbufferIds gives', () => {
+      const ids = gbufferIds(24);
+      expect(ids).toEqual({ NONE: 0, FLOOR: 1, KNIFE: 2, SKIN: 3, ORGANELLE: 4, SECTION: 28 });
+      for (const [k, v] of Object.entries(ids)) expect(s).toContain(`const GID_${k} = ${v.toFixed(1)};`);
+    });
+    And('an organelle id and a section id never collide for any material', () => {
+      for (const slots of [8, 24, 32]) {
+        const g = gbufferIds(slots), seen = new Set<number>([g.NONE, g.FLOOR, g.KNIFE, g.SKIN]);
+        for (let m = 0; m < slots; m++) for (const id of [g.ORGANELLE + m, g.SECTION + m]) { expect(seen.has(id)).toBe(false); seen.add(id); }
+        expect(Math.max(...seen)).toBeLessThanOrEqual(2048); // exact in an f16 channel
+      }
+    });
+  });
+
+  Scenario('The composite hook defaults to the identity', ({ When, Then }) => {
+    let s = '';
+    When('the composite hook is composed without an app hook', () => { s = composeCompositeHook(); });
+    Then('it defines hookComposite once and returns its colour unchanged', () => {
+      expect(s).toBe(COMPOSITE_HOOK_DEFAULT + '\n');
+      expect(s.split('fn hookComposite(').length - 1).toBe(1);
+      expect(s).toMatch(/fn hookComposite\(c: vec3f, px: vec2i, uv: vec2f\) -> vec3f \{ return c; \}/);
+    });
+    When('the composite hook is composed with an app hook', () => { s = composeCompositeHook('fn hookComposite(c: vec3f, px: vec2i, uv: vec2f) -> vec3f { return c * 0.5; }'); });
+    Then("the app's hook is used and no default is added", () => {
+      expect(s).toContain('return c * 0.5;');
+      expect(s.split('fn hookComposite(').length - 1).toBe(1);
     });
   });
 });

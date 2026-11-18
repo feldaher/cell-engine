@@ -37,3 +37,14 @@ Feature: The pure parts of the jelly renderer
   Scenario: Constants are written as WGSL floats
     When the constants a = 2 and b = 0.25 are written
     Then the text declares a as 2.0 and b as 0.25
+
+  Scenario: The prelude declares the G-buffer ids
+    When the shader prelude is composed for 24 material slots
+    Then it declares GID_NONE, GID_FLOOR, GID_KNIFE, GID_SKIN, GID_ORGANELLE and GID_SECTION with the values gbufferIds gives
+    And an organelle id and a section id never collide for any material
+
+  Scenario: The composite hook defaults to the identity
+    When the composite hook is composed without an app hook
+    Then it defines hookComposite once and returns its colour unchanged
+    When the composite hook is composed with an app hook
+    Then the app's hook is used and no default is added

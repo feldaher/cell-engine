@@ -55,7 +55,7 @@ fn brushed(origin: vec3f, N: vec3f, V: vec3f, T: vec3f, spread: f32) -> vec3f {
   return c / 4.1;
 }
 
-@fragment fn fs(in: VOut) -> @location(0) vec4f {
+@fragment fn fs(in: VOut) -> SceneOut {
   var N = normalize(in.nrm);
   let V = normalize(F.camPos.xyz - in.world);
   if (dot(N, V) < 0.0) { N = -N; }
@@ -108,5 +108,5 @@ fn brushed(origin: vec3f, N: vec3f, V: vec3f, T: vec3f, spread: f32) -> vec3f {
     // a faint darkening where the flat meets the spine, as on a forged blade
     if (isFlat) { c *= 0.94 + 0.06 * smoothstep(0.0, 0.5, p.y); }
   }
-  return vec4f(c, 1.0);
+  return SceneOut(vec4f(c, 1.0), gbufTexel(in.world, N, GID_KNIFE));
 }

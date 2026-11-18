@@ -28,6 +28,13 @@ struct PieceU { planes: array<vec4f, 8>, info: vec4f };  // info.x = plane count
 
 const PI = 3.14159265;
 
+// The scene passes write their colour and a G-buffer texel (v0.5.0): view-space normal xy, linear view depth, id.
+struct SceneOut { @location(0) c: vec4f, @location(1) g: vec4f };
+fn gbufTexel(world: vec3f, N: vec3f, id: f32) -> vec4f {
+  let n = normalize((F.view * vec4f(N, 0.0)).xyz);
+  return vec4f(n.xy, -(F.view * vec4f(world, 1.0)).z, id);
+}
+
 fn ellipsoidSdf(p: vec3f, c: vec3f, r: vec3f) -> f32 {
   let q = p - c;
   let k0 = length(q / r);

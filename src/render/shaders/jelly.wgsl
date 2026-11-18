@@ -30,7 +30,7 @@ struct VOut {
   return o;
 }
 
-@fragment fn fs(in: VOut) -> @location(0) vec4f {
+@fragment fn fs(in: VOut) -> SceneOut {
   let N = normalize(in.nrm);
   let V = normalize(F.camPos.xyz - in.world);
   let L = F.lightDir.xyz;
@@ -67,12 +67,14 @@ struct VOut {
   let back = pow(max(dot(-L, V), 0.0), 2.0) * 0.5 + 0.25;
   c += scat.rgb * (1.0 - smoothstep(0.0, 1.4, thick)) * back * 0.35 * (1.0 - emissive);
 
+  var gid = GID_SKIN;
   var rough = 0.16;
   var f0 = 0.035;
   if (isCut) {
     // A stained section through the rest-space anatomy.
     let s = sectionAt(in.rest);
     let m = s.x;
+    gid = GID_SECTION + floor(m + 0.5);
     if (m > 0.5) {
       let base = materialColor(m);
       let diff = 0.55 + 0.45 * max(dot(N, L), 0.0) * light;
@@ -112,5 +114,5 @@ struct VOut {
   c += vec3f(1.0, 0.98, 0.95) * ggx(N, V, L, rough) * 0.9 * sh;
   let fill = normalize(vec3f(0.7, 0.4, -0.6));
   c += vec3f(0.8, 0.85, 0.95) * ggx(N, V, fill, rough + 0.1) * 0.25;
-  return vec4f(c, 1.0);
+  return SceneOut(vec4f(c, 1.0), gbufTexel(in.world, N, gid));
 }

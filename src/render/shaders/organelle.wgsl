@@ -25,7 +25,7 @@ fn clippedAway(rest: vec3f) -> bool {
   return false;
 }
 
-@fragment fn fs(in: VOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+@fragment fn fs(in: VOut, @builtin(front_facing) front: bool) -> SceneOut {
   if (clippedAway(in.rest) || isHidden(in.mat) || hookOrganelleHidden(in.mat, in.coord, in.rest)) { discard; }
   var N = normalize(in.nrm);
   let V = normalize(F.camPos.xyz - in.world);
@@ -49,5 +49,5 @@ fn clippedAway(rest: vec3f) -> bool {
       c = mix(c, F.palette[2].rgb, 0.65);
     }
   }
-  return vec4f(c, 1.0);
+  return SceneOut(vec4f(c, 1.0), gbufTexel(in.world, N, GID_ORGANELLE + floor(in.mat + 0.5)));
 }

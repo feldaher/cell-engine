@@ -9,7 +9,7 @@ struct VOut { @builtin(position) clip: vec4f, @location(0) world: vec3f };
   return o;
 }
 
-@fragment fn fs(in: VOut) -> @location(0) vec4f {
+@fragment fn fs(in: VOut) -> SceneOut {
   let bg = F.palette[2].rgb;
   let sh = shadowAt(in.world, 2.2);
   let ao = contactOcclusion(in.world);
@@ -18,5 +18,5 @@ struct VOut { @builtin(position) clip: vec4f, @location(0) world: vec3f };
   let shadowCol = bg * mix(vec3f(0.62), tint * 0.8, 0.45);
   var c = mix(shadowCol, bg, sh);
   c *= 1.0 - 0.55 * ao;
-  return vec4f(c, 1.0);
+  return SceneOut(vec4f(c, 1.0), gbufTexel(in.world, vec3f(0.0, 1.0, 0.0), GID_FLOOR));
 }

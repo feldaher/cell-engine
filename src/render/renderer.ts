@@ -2,14 +2,15 @@
 //   1. key-light shadow map and a bottom-up "floor map" (height of the body over the floor)
 //   2. opaque scene: floor, organelles (clipped at knife planes), knife
 //   3. per piece, back to front: back-face depth → jelly front faces refracting the scene
-//   4. composite to the canvas (+ tet edges when "Show mesh" is on)
+//   4. composite to the canvas through the app's composite hook (+ tet edges when "Show mesh" is on)
+// The opaque pass and the jelly passes also write a G-buffer each (normal, depth, id) for the hook (v0.5.0).
 // Moved from Jelly Cells (src/render/renderer.ts) in v0.4.0; the app's inputs are the palette,
 // the packed primitives and the WGSL hooks (../outputs/design/2026-10-28_v0.4.0-contract.md).
 
 import type { Piece, SkinMesh, WorldMesh } from '../contracts';
 import { lookAt, mul, ortho, perspective, type M4 } from '../math/mat4';
 import { PALETTE } from './palette';
-import { composeShaderPrelude } from './wgsl';
+import { composeCompositeHook, composeShaderPrelude } from './wgsl';
 import commonWgsl from './shaders/common.wgsl?raw';
 import shadowWgsl from './shaders/shadowmaps.wgsl?raw';
 import depthWgsl from './shaders/depth.wgsl?raw';
@@ -39,7 +40,8 @@ export interface RendererOptions {
   wallMaterial?: number;
   /** Material drawn as rings within the wall; negative for none (default -1). */
   scarMaterial?: number;
-  hooks?: { constantsWgsl?: string; organelleWgsl?: string };
+  /** compositeWgsl: a `hookComposite` run on every pixel after tone mapping (v0.5.0; default the identity). */
+  hooks?: { constantsWgsl?: string; organelleWgsl?: string; compositeWgsl?: string };
 }
 
 export interface PrimitiveInfo {
@@ -86,6 +88,9 @@ interface GpuPiece {
 
 const DEPTH = 'depth32float';
 const HDR = 'rgba16float';
+/** G-buffer texels: view normal xy, linear view depth, id (render/wgsl.ts gbufferIds). */
+const GBUF = 'rgba16float';
+const FAR = 200;
 const SHADOW_SIZE = 2048;
 const FLOOR_SIZE = 512;
 const FLOOR_EXTENT = 11;
@@ -125,6 +130,8 @@ export class Renderer {
   private accum!: GPUTexture;
   private sceneDepth!: GPUTexture;
   private backDepth!: GPUTexture;
+  private gOpaque!: GPUTexture;
+  private gJelly!: GPUTexture;
 
   private gFrame!: GPUBindGroup;
   private gShadow: GPUBindGroup;
@@ -191,6 +198,8 @@ export class Renderer {
     this.bglBlit = d.createBindGroupLayout({ entries: [
       { binding: 0, visibility: FR, texture: { sampleType: 'unfilterable-float' } },
       { binding: 1, visibility: FR, buffer: {} },
+      { binding: 2, visibility: FR, texture: { sampleType: 'unfilterable-float' } },
+      { binding: 3, visibility: FR, texture: { sampleType: 'unfilterable-float' } },
     ] });
 
     const mod = (code: string) => d.createShaderModule({ code });
@@ -216,7 +225,7 @@ export class Renderer {
     this.pDepthNoCull = depthPipe('none');
     this.pDepthCullFront = depthPipe('front');
 
-    const hdrTarget: GPUColorTargetState[] = [{ format: HDR }];
+    const hdrTarget: GPUColorTargetState[] = [{ format: HDR }, { format: GBUF }];
     const opaqueDepth: GPUDepthStencilState = { format: DEPTH, depthWriteEnabled: true, depthCompare: 'less' };
     const floorMod = mod(common + floorWgsl);
     this.pFloor = d.createRenderPipeline({
@@ -250,9 +259,9 @@ export class Renderer {
       primitive: { topology: 'triangle-list', cullMode: 'back' },
       depthStencil: { format: DEPTH, depthWriteEnabled: false, depthCompare: 'less' },
     });
-    const blitMod = mod(blitWgsl);
+    const blitMod = mod(prelude + composeCompositeHook(opts.hooks?.compositeWgsl) + commonWgsl + '\n' + blitWgsl);
     this.pBlit = d.createRenderPipeline({
-      layout: layout(this.bglBlit),
+      layout: layout(this.bglFrame, this.bglBlit),
       vertex: { module: blitMod, entryPoint: 'vs' },
       fragment: { module: blitMod, entryPoint: 'fs', targets: [{ format: this.format }] },
       primitive: { topology: 'triangle-list' },
@@ -307,12 +316,14 @@ export class Renderer {
     if (w === this.width && h === this.height) return;
     this.width = w; this.height = h;
     this.canvas.width = w; this.canvas.height = h;
-    for (const t of [this.sceneColor, this.accum, this.sceneDepth, this.backDepth]) t?.destroy();
+    for (const t of [this.sceneColor, this.accum, this.sceneDepth, this.backDepth, this.gOpaque, this.gJelly]) t?.destroy();
     const d = this.device, T = GPUTextureUsage;
     this.sceneColor = d.createTexture({ size: [w, h], format: HDR, usage: T.RENDER_ATTACHMENT | T.TEXTURE_BINDING | T.COPY_SRC | T.COPY_DST });
     this.accum = d.createTexture({ size: [w, h], format: HDR, usage: T.RENDER_ATTACHMENT | T.TEXTURE_BINDING | T.COPY_SRC | T.COPY_DST });
     this.sceneDepth = d.createTexture({ size: [w, h], format: DEPTH, usage: T.RENDER_ATTACHMENT | T.TEXTURE_BINDING });
     this.backDepth = d.createTexture({ size: [w, h], format: DEPTH, usage: T.RENDER_ATTACHMENT | T.TEXTURE_BINDING });
+    this.gOpaque = d.createTexture({ size: [w, h], format: GBUF, usage: T.RENDER_ATTACHMENT | T.TEXTURE_BINDING });
+    this.gJelly = d.createTexture({ size: [w, h], format: GBUF, usage: T.RENDER_ATTACHMENT | T.TEXTURE_BINDING });
     const lin = d.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
     this.gScreen = d.createBindGroup({ layout: this.bglScreen, entries: [
       { binding: 0, resource: this.sceneColor.createView() },
@@ -323,6 +334,8 @@ export class Renderer {
     this.gBlit = d.createBindGroup({ layout: this.bglBlit, entries: [
       { binding: 0, resource: this.accum.createView() },
       { binding: 1, resource: { buffer: this.blitBuf } },
+      { binding: 2, resource: this.gOpaque.createView() },
+      { binding: 3, resource: this.gJelly.createView() },
     ] });
   }
 
@@ -409,7 +422,7 @@ export class Renderer {
   cameraMatrices(cam: Camera) {
     this.resize();
     const aspect = this.width / this.height;
-    const near = 0.5, far = 200;
+    const near = 0.5, far = FAR;
     const proj = perspective(cam.fovY, aspect, near, far);
     proj[8] = -2 * (cam.lensShiftX ?? 0);
     proj[9] = -2 * (cam.lensShiftY ?? 0);
@@ -437,7 +450,7 @@ export class Renderer {
     f.set([...cam.eye, 1], 64);
     f.set([...L, 0], 68);
     f.set([this.width, this.height, 1 / this.width, 1 / this.height], 72);
-    f.set([proj[10], proj[14], 0.5, 200], 76);
+    f.set([proj[10], proj[14], 0.5, FAR], 76);
     f.set([opt.time, this.primCount, opt.highlight, opt.hidden], 80);
     f.set(opt.palette, 84);
     f[84 + 4 * PALETTE.optics + 3] = opt.scalarView ? 1 : 0;
@@ -478,7 +491,10 @@ export class Renderer {
     // Opaque scene.
     {
       const pass = enc.beginRenderPass({
-        colorAttachments: [{ view: this.sceneColor.createView(), clearValue: { r: bg[0], g: bg[1], b: bg[2], a: 1 }, loadOp: 'clear', storeOp: 'store' }],
+        colorAttachments: [
+          { view: this.sceneColor.createView(), clearValue: { r: bg[0], g: bg[1], b: bg[2], a: 1 }, loadOp: 'clear', storeOp: 'store' },
+          { view: this.gOpaque.createView(), clearValue: G_EMPTY, loadOp: 'clear', storeOp: 'store' },
+        ],
         depthStencilAttachment: { view: this.sceneDepth.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' },
       });
       pass.setBindGroup(0, this.gFrame);
@@ -498,7 +514,8 @@ export class Renderer {
     }
     enc.copyTextureToTexture({ texture: this.sceneColor }, { texture: this.accum }, [this.width, this.height]);
 
-    // Jelly, back to front; each piece refracts everything drawn before it.
+    // Jelly, back to front; each piece refracts everything drawn before it, and the nearest ends up in gJelly.
+    enc.beginRenderPass({ colorAttachments: [{ view: this.gJelly.createView(), clearValue: G_EMPTY, loadOp: 'clear', storeOp: 'store' }] }).end();
     const eye = cam.eye;
     const order = gps
       .map((g) => ({ g, d: dist2(centroid(g.piece.sim.pos), eye) }))
@@ -507,7 +524,10 @@ export class Renderer {
     order.forEach((g, i) => {
       depthOnly(this.backDepth, this.pDepthCullFront, this.gCamMain, [g.skin]);
       const pass = enc.beginRenderPass({
-        colorAttachments: [{ view: this.accum.createView(), loadOp: 'load', storeOp: 'store' }],
+        colorAttachments: [
+          { view: this.accum.createView(), loadOp: 'load', storeOp: 'store' },
+          { view: this.gJelly.createView(), loadOp: 'load', storeOp: 'store' },
+        ],
         depthStencilAttachment: { view: this.sceneDepth.createView(), depthReadOnly: true },
       });
       pass.setPipeline(this.pJelly);
@@ -524,7 +544,8 @@ export class Renderer {
     {
       const pass = enc.beginRenderPass({ colorAttachments: [{ view: this.context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }] });
       pass.setPipeline(this.pBlit);
-      pass.setBindGroup(0, this.gBlit);
+      pass.setBindGroup(0, this.gFrame);
+      pass.setBindGroup(1, this.gBlit);
       pass.draw(3);
       if (opt.showMesh) {
         const lc = emissive ? [0.85, 0.9, 1, 0.28] : [0.08, 0.07, 0.06, 0.32];
@@ -542,6 +563,9 @@ export class Renderer {
     q.submit([enc.finish()]);
   }
 }
+
+/** An empty G-buffer texel: no normal, the far plane, GID_NONE. */
+const G_EMPTY = { r: 0, g: 0, b: FAR, a: 0 };
 
 function normalize(v: number[]) { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; }
 function centroid(p: Float32Array) {
