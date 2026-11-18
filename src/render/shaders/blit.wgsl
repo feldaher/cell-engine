@@ -1,4 +1,5 @@
-// Final composite to the canvas: a highlight shoulder, a gentle vignette, the app's composite hook, gamma and dither.
+// Final composite to the canvas: a highlight shoulder, a gentle vignette, the app's composite hooks (colour, then
+// alpha, v0.6.0), gamma and dither. The output is premultiplied; with an opaque canvas alpha is 1 and has no effect.
 // Preceded by the prelude, the composite hook (render/wgsl.ts) and common.wgsl, so the hook can read the Frame
 // uniform (palette, light, screen) and the two G-buffers below (v0.5.0).
 @group(1) @binding(0) var src: texture_2d<f32>;
@@ -60,8 +61,9 @@ fn toSrgb(c: vec3f) -> vec3f {
   let d = distance(in.uv, vec2f(0.5));
   c *= 1.0 - bg.w * smoothstep(0.45, 0.9, d);
   c = hookComposite(c, px, in.uv);
+  let a = clamp(hookCompositeAlpha(c, px, in.uv), 0.0, 1.0);
   var s = toSrgb(max(c, vec3f(0.0)));
   let n = fract(sin(dot(in.clip.xy, vec2f(12.9898, 78.233))) * 43758.5453);
   s += (n - 0.5) / 255.0;
-  return vec4f(s, 1.0);
+  return vec4f(s * a, a);
 }

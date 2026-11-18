@@ -40,8 +40,13 @@ export interface RendererOptions {
   wallMaterial?: number;
   /** Material drawn as rings within the wall; negative for none (default -1). */
   scarMaterial?: number;
-  /** compositeWgsl: a `hookComposite` run on every pixel after tone mapping (v0.5.0; default the identity). */
+  /**
+   * compositeWgsl: a `hookComposite` run on every pixel after tone mapping (v0.5.0; default the identity), and
+   * optionally a `hookCompositeAlpha` (v0.6.0; default 1).
+   */
   hooks?: { constantsWgsl?: string; organelleWgsl?: string; compositeWgsl?: string };
+  /** v0.6.0: a canvas the page shows through, where hookCompositeAlpha is below 1 (default false: opaque). */
+  transparent?: boolean;
 }
 
 export interface PrimitiveInfo {
@@ -164,7 +169,7 @@ export class Renderer {
     const slots = opts.materialSlots ?? 24;
     this.frameFloats = 84 + (6 + slots) * 4;
     this.format = navigator.gpu.getPreferredCanvasFormat();
-    context.configure({ device, format: this.format, alphaMode: 'opaque' });
+    context.configure({ device, format: this.format, alphaMode: opts.transparent ? 'premultiplied' : 'opaque' });
     const d = device;
     const U = GPUBufferUsage;
     this.frameBuf = d.createBuffer({ size: this.frameFloats * 4, usage: U.UNIFORM | U.COPY_DST });

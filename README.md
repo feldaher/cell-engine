@@ -35,7 +35,7 @@ test: { server: { deps: { inline: ['@feldaher/cell-engine'] } } },
 | `mesh/icosphere` | a closed sphere with a topology you can rely on, by radius or by the volume it must enclose |
 | `cut/cut`, `cut/knife` | a world plane splits pieces; children inherit the motion; an animated blade |
 | `fields/fem` | reaction–diffusion by P1 FEM with lumped mass and backward Euler, amount-conserving under deformation, over tetrahedra in a volume or triangles on a surface |
-| `render/renderer` | WebGPU jelly: refraction, Beer–Lambert absorption, sections at knife faces, organelles, shadows. The app gives a palette, packed primitives and optional WGSL hooks; since v0.5.0 it also writes G-buffers (normal, depth, id) that an app's `hookComposite` can read to draw lines (`outputs/design/2026-11-18_v0.5.0-ink-pass.md`) |
+| `render/renderer` | WebGPU jelly: refraction, Beer–Lambert absorption, sections at knife faces, organelles, shadows. The app gives a palette, packed primitives and optional WGSL hooks; since v0.5.0 it also writes G-buffers (normal, depth, id) that an app's `hookComposite` can read to draw lines (`outputs/design/2026-11-18_v0.5.0-ink-pass.md`); since v0.6.0 a `transparent` canvas and `hookCompositeAlpha` let a page show through |
 | `render/palette`, `render/primitives`, `render/wgsl` | palette packing and sRGB conversion; primitive packing and the hidden-material mask; the shader prelude, the organelle hooks and the composite hook with their defaults, and the G-buffer ids |
 | `ui/plot` | a canvas plot of series: nice ticks, bounds, faint earlier runs, dashed traces, marks |
 | `game/record` | a run kept as frames at a fixed interval, scrubbed by a playhead; a seeded generator for replay |

@@ -112,7 +112,7 @@ describeFeature(feature, ({ Scenario }) => {
     let s = '';
     When('the composite hook is composed without an app hook', () => { s = composeCompositeHook(); });
     Then('it defines hookComposite once and returns its colour unchanged', () => {
-      expect(s).toBe(COMPOSITE_HOOK_DEFAULT + '\n');
+      expect(s).toContain(COMPOSITE_HOOK_DEFAULT);
       expect(s.split('fn hookComposite(').length - 1).toBe(1);
       expect(s).toMatch(/fn hookComposite\(c: vec3f, px: vec2i, uv: vec2f\) -> vec3f \{ return c; \}/);
     });
@@ -120,6 +120,23 @@ describeFeature(feature, ({ Scenario }) => {
     Then("the app's hook is used and no default is added", () => {
       expect(s).toContain('return c * 0.5;');
       expect(s.split('fn hookComposite(').length - 1).toBe(1);
+    });
+  });
+
+  Scenario('The composite alpha hook defaults to opaque', ({ When, Then }) => {
+    let s = '';
+    const colour = 'fn hookComposite(c: vec3f, px: vec2i, uv: vec2f) -> vec3f { return c; }';
+    When('the composite hook is composed with only an app colour hook', () => { s = composeCompositeHook(colour); });
+    Then('it defines hookCompositeAlpha once and it returns 1', () => {
+      expect(s.split('fn hookCompositeAlpha(').length - 1).toBe(1);
+      expect(s).toMatch(/fn hookCompositeAlpha\(c: vec3f, px: vec2i, uv: vec2f\) -> f32 \{ return 1\.0; \}/);
+    });
+    When('the composite hook is composed with an app alpha hook as well', () => {
+      s = composeCompositeHook(colour + '\nfn hookCompositeAlpha(c: vec3f, px: vec2i, uv: vec2f) -> f32 { return 0.5; }');
+    });
+    Then("the app's alpha hook is used and no default alpha is added", () => {
+      expect(s).toContain('return 0.5;');
+      expect(s.split('fn hookCompositeAlpha(').length - 1).toBe(1);
     });
   });
 });

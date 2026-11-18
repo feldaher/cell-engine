@@ -48,3 +48,9 @@ Feature: The pure parts of the jelly renderer
     Then it defines hookComposite once and returns its colour unchanged
     When the composite hook is composed with an app hook
     Then the app's hook is used and no default is added
+
+  Scenario: The composite alpha hook defaults to opaque
+    When the composite hook is composed with only an app colour hook
+    Then it defines hookCompositeAlpha once and it returns 1
+    When the composite hook is composed with an app alpha hook as well
+    Then the app's alpha hook is used and no default alpha is added
