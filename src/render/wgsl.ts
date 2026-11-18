@@ -29,7 +29,10 @@ export function gbufferIds(materialSlots: number) {
 }
 
 export const COMPOSITE_HOOK_DEFAULT = 'fn hookComposite(c: vec3f, px: vec2i, uv: vec2f) -> vec3f { return c; }';
-/** v0.6.0: the pixel's alpha. With a transparent canvas (RendererOptions.transparent) it lets the page show through. */
+/**
+ * v0.6.0: the pixel's alpha. With a transparent canvas (RendererOptions.transparent) it lets the page show through. It
+ * gets the same tone-mapped colour as hookComposite, not that hook's result.
+ */
 export const COMPOSITE_ALPHA_DEFAULT = 'fn hookCompositeAlpha(c: vec3f, px: vec2i, uv: vec2f) -> f32 { return 1.0; }';
 
 /** The app's composite hooks, with the defaults (identity colour, opaque alpha) for any it leaves out. */

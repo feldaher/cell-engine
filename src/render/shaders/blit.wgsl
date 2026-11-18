@@ -60,8 +60,9 @@ fn toSrgb(c: vec3f) -> vec3f {
   if (peak > 0.8) { c *= (0.8 + (1.0 - exp(-(peak - 0.8) * 2.5)) * 0.2) / peak; }
   let d = distance(in.uv, vec2f(0.5));
   c *= 1.0 - bg.w * smoothstep(0.45, 0.9, d);
-  c = hookComposite(c, px, in.uv);
+  // both hooks see the same tone-mapped colour
   let a = clamp(hookCompositeAlpha(c, px, in.uv), 0.0, 1.0);
+  c = hookComposite(c, px, in.uv);
   var s = toSrgb(max(c, vec3f(0.0)));
   let n = fract(sin(dot(in.clip.xy, vec2f(12.9898, 78.233))) * 43758.5453);
   s += (n - 0.5) / 255.0;
